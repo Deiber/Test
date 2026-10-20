@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "issue-agent"
+version = "0.1.0"
+description = "Turn a new GitHub issue into a branch and a linked pull request with any coding agent."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+dependencies = []
+
+[project.optional-dependencies]
+cursor = ["cursor-sdk"]
+dev = ["pytest"]
+
+[project.scripts]
+issue-agent = "issue_agent.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
