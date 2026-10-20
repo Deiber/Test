@@ -60,13 +60,13 @@ coding.work_open_issues()
 
 `work` fetches that issue and returns without editing when the label is missing. `work_open_issues` lists open issues that already have the label and works through them in order. The label name defaults to `ai-coding-ready`. Pass `label=` to use another one.
 
-The checkout in `repo_dir` (the current directory by default) must be that repository. Reading issues uses `GITHUB_TOKEN` or `GH_TOKEN`.
+By default the kit uses the git root of the directory where you run it, and reads `owner/name` from that checkout's `origin` remote. Reading issues uses `GITHUB_TOKEN` or `GH_TOKEN`.
 
-From the command line:
+From the command line, inside the repository:
 
 ```bash
-issue-agent work https://github.com/owner/name/issues/12 --repo owner/name --command "codex exec --sandbox workspace-write -"
-issue-agent work-open --repo owner/name --command "codex exec --sandbox workspace-write -"
+issue-agent work https://github.com/owner/name/issues/12 --command "codex exec --sandbox workspace-write -"
+issue-agent work-open --command "codex exec --sandbox workspace-write -"
 ```
 
 ## Local check

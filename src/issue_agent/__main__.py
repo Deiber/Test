@@ -80,8 +80,8 @@ def _run_action(environ: Mapping[str, str]) -> int:
 
 def _run_cli(argv: Sequence[str], environ: Mapping[str, str]) -> int:
     shared = argparse.ArgumentParser(add_help=False)
-    shared.add_argument("--repo", default=environ.get("REPO") or "")
-    shared.add_argument("--repo-dir", default=environ.get("REPO_DIR") or os.getcwd())
+    shared.add_argument("--repo", default="")
+    shared.add_argument("--repo-dir", default="")
     shared.add_argument("--label", default=environ.get("READY_LABEL") or READY_LABEL)
     shared.add_argument("--base", default=environ.get("BASE_REF") or "main")
     shared.add_argument("--command", default=environ.get("AGENT_COMMAND") or "")
@@ -104,7 +104,7 @@ def _run_cli(argv: Sequence[str], environ: Mapping[str, str]) -> int:
     coding = IssueCoding(
         command,
         repo=parsed.repo or None,
-        repo_dir=parsed.repo_dir,
+        repo_dir=parsed.repo_dir or Path.cwd(),
         label=parsed.label,
         base_ref=parsed.base,
         token=parsed.token or None,

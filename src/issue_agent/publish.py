@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from issue_agent.github import post_issue_comment
+
 Run = Callable[..., subprocess.CompletedProcess[str]]
 
 
@@ -78,18 +80,21 @@ class GitHubPublisher:
         return url
 
     def comment(self, issue_number: int, body: str) -> None:
-        self._run(
-            [
-                "gh",
-                "issue",
-                "comment",
-                str(issue_number),
-                "--repo",
-                self.repo_slug,
-                "--body",
-                body,
-            ],
-            text=True,
-            capture_output=True,
-            check=True,
-        )
+        try:
+            self._run(
+                [
+                    "gh",
+                    "issue",
+                    "comment",
+                    str(issue_number),
+                    "--repo",
+                    self.repo_slug,
+                    "--body",
+                    body,
+                ],
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+        except FileNotFoundError:
+            post_issue_comment(self.repo_slug, issue_number, body)

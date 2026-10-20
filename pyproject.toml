@@ -13,7 +13,8 @@ dependencies = []
 
 [project.optional-dependencies]
 cursor = ["cursor-sdk"]
-dev = ["pytest"]
+dev = ["pytest", "fastapi", "httpx"]
+sample = ["fastapi", "uvicorn"]
 
 [project.scripts]
 issue-agent = "issue_agent.__main__:main"
