@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from issue_agent.__main__ import main
+from issue_agent.checkout import git_root, parse_github_remote
 from issue_agent.github import GitHubIssues
 from issue_agent.issues import Issue, IssueRef, parse_issue
 from issue_agent.sdk import READY_LABEL, IssueCoding
@@ -137,6 +138,35 @@ def test_work_open_issues_keeps_each_change_on_its_own_branch(tmp_path: Path) ->
     assert _file_on_branch(repo, "issue/1-first", "done-2.txt") is None
     assert _file_on_branch(repo, "issue/2-second", "done-2.txt") == "ok\n"
     assert _file_on_branch(repo, "issue/2-second", "done-1.txt") is None
+
+
+def test_parse_github_remote() -> None:
+    assert parse_github_remote("https://github.com/Deiber/Test.git") == "Deiber/Test"
+    assert parse_github_remote("git@github.com:acme/app.git") == "acme/app"
+    assert parse_github_remote("ssh://git@github.com/acme/my.repo") == "acme/my.repo"
+
+
+def test_command_uses_the_checkout_root_and_origin(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    nested = repo / "pkg"
+    nested.mkdir()
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/acme/app.git"],
+        cwd=repo,
+        check=True,
+    )
+    github = FakeGitHub({3: _ready_issue(3, "Add ping")})
+    coding = IssueCoding(
+        [sys.executable, "-c", "from pathlib import Path; Path('ping.py').write_text('ok\\n')"],
+        repo_dir=nested,
+        github=github,
+        publisher=RecordingPublisher(),
+    )
+    result = coding.work("#3")
+    assert coding.repo == "acme/app"
+    assert coding.repo_dir == git_root(nested)
+    assert result.status == "opened"
+    assert (repo / "ping.py").read_text(encoding="utf-8") == "ok\n"
 
 
 def test_action_mode_skips_without_the_label(tmp_path: Path) -> None:

@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Protocol, Sequence
 
+from issue_agent.checkout import git_root, github_slug
 from issue_agent.github import GitHubError, GitHubIssues
 from issue_agent.issues import Issue, IssueRef, has_label, parse_issue
 from issue_agent.publish import GitHubPublisher
@@ -51,6 +52,7 @@ class IssueCoding:
 
     def work(self, issue: str) -> Result:
         """Fetch one issue URL and start the agent when it has the ready label."""
+        self._ensure_checkout()
         ref = parse_issue(issue, default_repo=self.repo)
         self._require_same_repo(ref.slug)
         loaded = self.github.get(ref)
@@ -58,6 +60,7 @@ class IssueCoding:
 
     def work_open_issues(self, repo: str | None = None) -> list[Result]:
         """Find open issues with the ready label and start the agent on each."""
+        self._ensure_checkout()
         slug = (repo or self.repo or "").strip()
         if not slug:
             raise ValueError("repo is required to look for open issues")
@@ -70,6 +73,7 @@ class IssueCoding:
         reason = self._skip_reason(issue)
         if reason is not None:
             return Result(status="skipped", detail=reason)
+        self._ensure_checkout()
         self._checkout_base()
         slug = issue.repo or self.repo
         if not slug:
@@ -101,6 +105,11 @@ class IssueCoding:
         if not has_label(issue.labels, self.label):
             return f"missing label {self.label}"
         return None
+
+    def _ensure_checkout(self) -> None:
+        self.repo_dir = git_root(self.repo_dir)
+        if not self.repo:
+            self.repo = github_slug(self.repo_dir)
 
     def _require_same_repo(self, slug: str) -> None:
         if self.repo and slug.casefold() != self.repo.casefold():

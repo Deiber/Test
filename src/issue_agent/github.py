@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -133,6 +134,34 @@ def _error_message(body: str) -> str:
     if isinstance(payload, dict) and isinstance(payload.get("message"), str):
         return payload["message"]
     return body.strip()
+
+
+def post_issue_comment(repo: str, number: int, body: str, token: str | None = None) -> None:
+    """Comment through the GitHub API when the `gh` command is not installed."""
+    credential = (token or os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or "").strip()
+    if not credential:
+        raise GitHubError("gh is not installed. Set GITHUB_TOKEN to comment on the issue.")
+    owner, name = _split_repo(repo)
+    url = f"{_API}/repos/{owner}/{name}/issues/{number}/comments"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps({"body": body}).encode("utf-8"),
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {credential}",
+            "Content-Type": "application/json",
+            "User-Agent": "issue-agent",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response.read()
+    except urllib.error.HTTPError as err:
+        detail = err.read().decode("utf-8", errors="replace")
+        message = _error_message(detail) or err.reason
+        raise GitHubError(f"GitHub API {err.code}: {message}", status=err.code) from err
 
 
 def _fetch(url: str, token: str) -> tuple[bytes, Mapping[str, str]]:

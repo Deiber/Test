@@ -183,6 +183,72 @@ def test_failed_agent_does_not_publish(tmp_path: Path) -> None:
     assert "exit 3" in publisher.comments[0][1]
 
 
+def test_missing_agent_command_is_reported(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    publisher = RecordingPublisher()
+    result = implement(
+        repo=repo,
+        issue=Issue(number=1, title="Add hello", body=""),
+        command=["codex-is-not-installed", "exec"],
+        publisher=publisher,
+        base_ref="main",
+    )
+    assert result.status == "agent_failed"
+    assert result.detail == "command not found: codex-is-not-installed"
+    assert publisher.published == []
+
+
+def test_existing_issue_branch_is_reused(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    subprocess.run(["git", "checkout", "-b", "issue/4-add-ping"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "main"], cwd=repo, check=True)
+    publisher = RecordingPublisher()
+    result = implement(
+        repo=repo,
+        issue=Issue(number=4, title="Add ping", body=""),
+        command=[sys.executable, "-c", "from pathlib import Path; Path('ping.py').write_text('ok\\n')"],
+        publisher=publisher,
+        base_ref="main",
+    )
+    assert result.status == "opened"
+    assert result.branch == "issue/4-add-ping"
+    assert (repo / "ping.py").read_text(encoding="utf-8") == "ok\n"
+
+
+def test_comment_uses_the_api_when_gh_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    posted: list[tuple[str, int, str]] = []
+
+    def fake_post(repo: str, number: int, body: str, token: str | None = None) -> None:
+        posted.append((repo, number, body))
+
+    monkeypatch.setattr("issue_agent.publish.post_issue_comment", fake_post)
+
+    def run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if args[0] == "gh":
+            raise FileNotFoundError
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    GitHubPublisher("acme/app", run=run).comment(1, "hello")
+    assert posted == [("acme/app", 1, "hello")]
+
+
+def test_cursor_adapter_requires_python_312(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    import types
+
+    module = types.ModuleType("cursor_sdk")
+    module.AgentOptions = object
+    module.AsyncAgent = object
+    module.AsyncClient = object
+    module.CursorAgentError = type("CursorAgentError", (Exception,), {})
+    module.LocalAgentOptions = object
+    monkeypatch.setitem(sys.modules, "cursor_sdk", module)
+    monkeypatch.setattr(sys, "version_info", (3, 11, 0, "final", 0))
+    from issue_agent.adapters import cursor_local
+
+    assert cursor_local.main() == 1
+    assert "Python 3.12" in capsys.readouterr().err
+
+
 def test_github_publisher_reuses_an_existing_pr() -> None:
     calls: list[list[str]] = []
 

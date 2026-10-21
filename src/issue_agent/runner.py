@@ -72,20 +72,32 @@ def implement(
         branch=branch,
     )
     base_sha = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    _git(repo, "checkout", "-b", branch)
+    _start_branch(repo, branch)
     _ensure_identity(repo)
 
     with tempfile.TemporaryDirectory(prefix="issue-agent-") as tmp:
         prompt_file = Path(tmp) / "prompt.md"
         prompt_file.write_text(prompt, encoding="utf-8")
         resolved = [part.replace(_PROMPT_FILE_TOKEN, str(prompt_file)) for part in command]
-        completed = subprocess.run(
-            resolved,
-            input=prompt,
-            text=True,
-            cwd=repo,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                resolved,
+                input=prompt,
+                text=True,
+                cwd=repo,
+                check=False,
+            )
+        except FileNotFoundError:
+            program = resolved[0]
+            publisher.comment(
+                issue.number,
+                f"The coding agent command `{program}` was not found, so no pull request was opened.",
+            )
+            return Result(
+                status="agent_failed",
+                branch=branch,
+                detail=f"command not found: {program}",
+            )
 
     if completed.returncode != 0:
         publisher.comment(
@@ -119,6 +131,18 @@ def implement(
         issue_number=issue.number,
     )
     return Result(status="opened", branch=branch, pr_url=url)
+
+
+def _start_branch(repo: Path, branch: str) -> None:
+    existing = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=repo,
+        check=False,
+    )
+    if existing.returncode == 0:
+        _git(repo, "checkout", branch)
+        return
+    _git(repo, "checkout", "-b", branch)
 
 
 def _commit_worktree(repo: Path, issue: Issue) -> None:
